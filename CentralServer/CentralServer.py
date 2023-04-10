@@ -4,6 +4,7 @@ import sys
 import time
 import threading
 import mimetypes
+import pickle
 #John Dirkse Data Com Project 3 - p2p Central Server
 
 killThreads = False
@@ -56,23 +57,28 @@ def hostThreadFunction(hostSocket, hostAddr):
 
 
         while not killThreads:
-            dataSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #TODO might not have to use data socket.
+            dataSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             command = ""
             filename = ""
             command = hostSocket.recv(1024).decode() 
             time.sleep(.5)
 
             match command:
-                case 'QUIT': #TODO remove file entries from disconnecting host
+                case 'QUIT':
                     print(f"Disconnecting from host {hostAddr[0]}:{hostAddr[1]}.")
                     removeFiles(username)
                     hostSocket.close()
                     return
                 case 'SEARCH':
+                    searchTerm = hostSocket.recv(1024).decode() 
+                    dataSocket.connect((hostAddr[0], int(dataPort)))
+                    searchFiles(dataSocket, searchTerm, username)
+                    dataSocket.close()   
+                case 'DOWNLOAD':
                     filename = hostSocket.recv(1024).decode()
                     dataSocket.connect((hostAddr[0], int(dataPort)))
-                    searchFiles(dataSocket, filename)
-                    dataSocket.close()    
+                    serveDownload(dataSocket, filename, username)
+                    dataSocket.close()
         hostSocket.close() 
 
 def addFile(username, filename, description, connectionSpeed, hostName, hostPort):
@@ -89,18 +95,29 @@ def removeFiles(username):
             if username in info[0]:
                 files.remove(filename)
     
-def searchFiles(dataSocket, filename):
-    #TODO send over host socket potentially 
-    files = os.listdir(os.getcwd())
-    length = str(len(files))
-    dataSocket.send(length.encode()) #send amount of file names to expect
-    time.sleep(.1)
-    for filename in files:
-        print(filename)
-        dataSocket.send(filename.encode()) #send filenames
-        time.sleep(.1)
-    print("Successfully searched all files.")
-    return
+def searchFiles(dataSocket, searchTerm, username):
+    temp = []
+    for filename, fileInfo in files.items():
+        print(fileInfo)
+        for info in fileInfo:
+            print(info)
+            print(f"description: {info[2]}")
+            if (searchTerm in info[2] and username != info[0]):
+                temp.append(filename)
+    tempString = pickle.dumps(temp)
+    dataSocket.send(tempString)
+    return 
+
+def serveDownload(dataSocket, filename, username):
+    #send back ip/port that host should request filename from.
+    for currentFilename, fileInfo in files.items():
+        if(filename == currentFilename and username != fileInfo[0]):
+            ip = fileInfo[4]
+            port = fileInfo[5]
+            dataSocket.send(str(ip).encode())
+            dataSocket.send(str(port).encode())
+            return
+
 
 if __name__ == '__main__':
     main()
