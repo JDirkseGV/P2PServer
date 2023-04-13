@@ -3,6 +3,7 @@ import socket
 import sys
 import time
 import threading
+
 import random
 
 #John Dirkse Data Com Project 3 - p2p host
@@ -10,39 +11,37 @@ import random
 killThreads = False
 
 def main(): 
-    serverIp = "localhost"
+    hostIp = "localhost"
     serverPort = 11000      #11000 for host 1
+    hostDataPort = 4243 #host to host data port randomized when setting connection up
 
     centralIp = "localhost"
-    centralPort = 4242 #randomized when setting connection up
-
-    hostDataIp = "localhost"
-    hostDataPort = 4243 #randomized when setting connection up
+    centralDataPort = 4234 #central server to host port randomized and passed when setting connection up
 
     try:
         #serverSocket and server thread setup
         serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
-        serverSocket.bind((serverIp, serverPort))     
-        serverSocket.listen()                                             #sets up tcp socket to listen based on serverIp and serverPort
-        print(f"{serverIp}:{serverPort} is now live and listening")
+        serverSocket.bind((hostIp, serverPort))     
+        serverSocket.listen()                                             #sets up tcp socket to listen based on hostIp and serverPort
+        print(f"{hostIp}:{serverPort} is now live and listening")
         serverThread = threading.Thread(target=serverHandlerThread, args=(serverSocket))
         serverThread.start()
 
         #---------------------------------------- centralSocket for persistent central server connection
         centralSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        centralSocket.bind((serverIp, (serverPort-1))) #connect over port serverPort-1 aka 10999 so that Central server knows 11000 is server port where file can be retrieved.
+        centralSocket.bind((hostIp, (serverPort-1))) #connect over port serverPort-1 aka 10999 so that Central server knows 11000 is server port where file can be retrieved.
 
         #---------------------centralDataSocket for central to host data
         centralDataSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         centralDataPort = random.randint(1025, 65534)
-        centralDataSocket.bind((centralIp, centralPort))
+        centralDataSocket.bind((centralIp, centralDataPort))
         centralDataSocket.listen()
 
         #-------------------------------------- data socket for host to host
 
         hostDataSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         hostDataPort = random.randint(1025, 65534)
-        hostDataSocket.bind((hostDataIp, hostDataPort))
+        hostDataSocket.bind((hostIp, hostDataPort))
         hostDataSocket.listen()
         restart = True
         
@@ -50,7 +49,7 @@ def main():
         while True:
             hostSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             if restart:
-                print("----------------------------\nWelcome P2P Host! Connect to the central server with:\n[CONNECT <server ip/hostname> <server port>]")   
+                print("----------------------------\nWelcome to P2P Host! Connect to the central server with:\n[CONNECT <server ip/hostname> <server port>]")   
             else:
                 print("-----------------------------\nCommands:\n[LS]\n[SEARCH <keyword>]\n[GET <filename>]\n[QUIT]")
             command = input('Enter a command: ')
@@ -69,7 +68,21 @@ def main():
                             centralDataPort = str(centralDataPort)
                             centralSocket.send(centralDataPort.encode()) #let server know info for data transfer socket setup in the future.
                             centralDataPort = int(centralDataPort)
+
+                            username = input("Please enter your username: ")
+                            centralSocket.send(username.encode())
+                            speed = input("Please enter your connection speed: ")
+                            centralSocket.send(speed.encode())
+                            time.sleep(.1)
                             #TODO send file with filenames and descriptions of available files
+
+                            with open("sharedFiles.txt", "r") as file:
+                                for line in file:
+                                    cleanLine = line.strip()
+                                    print(cleanLine)
+                                    centralSocket.send(cleanLine.encode())
+                                    time.sleep(.1)
+
                             print("Connection sucess!")
                             restart = False
                         else:

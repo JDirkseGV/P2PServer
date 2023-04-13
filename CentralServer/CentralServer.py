@@ -9,7 +9,6 @@ import pickle
 
 killThreads = False
 files = {}
-users = {}
 
 def main(): 
     serverIp = "localhost"
@@ -36,26 +35,25 @@ def main():
 
 def hostThreadFunction(hostSocket, hostAddr):
         
+        dataPort = hostSocket.recv(1024).decode() 
+
         username = hostSocket.recv(1024).decode()
-        time.sleep(.1)
+
         connectionSpeed = hostSocket.recv(1024).decode()
-        time.sleep(.1)
 
         numFiles = hostSocket.recv(1024).decode() #get a heads up of how many entries are coming over.
-        for i in range(0, numFiles):
-            time.sleep(.1)
+
+        for i in range(int(numFiles)):
             file = hostSocket.recv(1024).decode() #recieve filenames and descriptions
-            file = file.split(",")
             file.strip()
+            file = file.split(",")
             filename = file[0]
             description = file[1]
-            hostAddr[1] += 1
-            addFile(username, filename, description, connectionSpeed, hostAddr[0], hostAddr[1])
+            print(f"filename: {filename}, Description: {description}")
+            serverPort = hostAddr[1] + 1 #TODO: fix this by passing the proper server port and not doing port trickery to get it freelo
+            addFile(username, filename, description, connectionSpeed, hostAddr[0], serverPort)
 
-        dataPort = hostSocket.recv(1024).decode() 
-        
-
-
+        print(f"available shared files:\n{files}")
         while not killThreads:
             dataSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             command = ""

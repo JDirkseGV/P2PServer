@@ -1,0 +1,3 @@
+2
+file1.txt,file1.txt - first sample text file
+babytiger.jpg,babytiger.jpg - cute picture image of a baby tiger
