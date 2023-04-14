@@ -91,7 +91,7 @@ def removeFiles(username):
             print(info)
             print(f"info 0: {info[0]}")
             if username in info[0]:
-                files.remove(filename)
+                files.remove(filename) #TODO: fix this line, there is no remove curreentyl
     
 def searchFiles(dataSocket, searchTerm, username):
     temp = []
