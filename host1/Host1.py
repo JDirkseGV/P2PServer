@@ -9,6 +9,7 @@ import random
 #John Dirkse Data Com Project 3 - p2p host
 
 killThreads = False
+sendDelay = .15
 
 def main(): 
     hostIp = "localhost"
@@ -29,7 +30,6 @@ def main():
 
         #---------------------------------------- centralSocket for persistent central server connection
         centralSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        centralSocket.bind((hostIp, (serverPort-1))) #connect over port serverPort-1 aka 10999 so that Central server knows 11000 is server port where file can be retrieved.
 
         #---------------------centralDataSocket for central to host data
         centralDataSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -62,26 +62,33 @@ def main():
                     case 'CONNECT': #TODO connect rework, 1 for central one for p2p
                         if len(arguments) == 3:
                             serverLocation = arguments[1]
-                            serverPort = int(arguments[2])
+                            centralServerPort = int(arguments[2])
                             print("Trying to connect to server...")
-                            centralSocket.connect((serverLocation, serverPort))
+                            centralSocket.connect((serverLocation, centralServerPort))
+
                             centralDataPort = str(centralDataPort)
                             centralSocket.send(centralDataPort.encode()) #let server know info for data transfer socket setup in the future.
                             centralDataPort = int(centralDataPort)
 
-                            username = input("Please enter your username: ")
-                            centralSocket.send(username.encode())
-                            speed = input("Please enter your connection speed: ")
-                            centralSocket.send(speed.encode())
-                            time.sleep(.1)
-                            #TODO send file with filenames and descriptions of available files
+                            time.sleep(sendDelay)
+                            centralSocket.send(str(serverPort).encode())
 
+                            
+                            username = input("Please enter your username: ")
+                            time.sleep(sendDelay)
+                            centralSocket.send(username.encode())
+                            
+                            speed = input("Please enter your connection speed: ")
+                            time.sleep(sendDelay)
+                            centralSocket.send(speed.encode())
+                            
+                            time.sleep(sendDelay)
                             with open("sharedFiles.txt", "r") as file:
                                 for line in file:
                                     cleanLine = line.strip()
                                     print(cleanLine)
                                     centralSocket.send(cleanLine.encode())
-                                    time.sleep(.1)
+                                    time.sleep(sendDelay)
 
                             print("Connection sucess!")
                             restart = False
@@ -126,7 +133,7 @@ def retrieveFiles(centralSocket, centralDataSocket, filename, hostSocket, hostDa
     #TODO: get ip/port from central, then set up connection with other host
 
     centralSocket.send("GET".encode())
-    time.sleep(.1)
+    time.sleep(sendDelay)
     centralSocket.send(filename.encode())
     dataConnection, serverAdr = centralDataSocket.accept()
     fileSize = int(dataConnection.recv(1024).decode())
@@ -182,7 +189,7 @@ def sendFiles(dataSocket, filename):
         print(filename + " found")
         fileSize = str(os.path.getsize(filename))
         dataSocket.send(fileSize.encode())
-        time.sleep(.5)
+        time.sleep(sendDelay)
         file = open(filename, "rb")
         chunk = file.read(1024)
         while chunk:

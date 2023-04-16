@@ -37,6 +37,8 @@ def hostThreadFunction(hostSocket, hostAddr):
         
         dataPort = hostSocket.recv(1024).decode() 
 
+        serverPort = hostSocket.recv(1024).decode()
+
         username = hostSocket.recv(1024).decode()
 
         connectionSpeed = hostSocket.recv(1024).decode()
@@ -50,7 +52,6 @@ def hostThreadFunction(hostSocket, hostAddr):
             filename = file[0]
             description = file[1]
             print(f"filename: {filename}, Description: {description}")
-            serverPort = hostAddr[1] + 1 #TODO: fix this by passing the proper server port and not doing port trickery to get it freelo
             addFile(username, filename, description, connectionSpeed, hostAddr[0], serverPort)
 
         print(f"available shared files:\n{files}")
@@ -85,13 +86,18 @@ def addFile(username, filename, description, connectionSpeed, hostName, hostPort
     files[filename].append((username, filename, description, connectionSpeed, hostName, hostPort))
 
 def removeFiles(username):
-    for filename, fileInfo in files.items():
-        print(fileInfo)
-        for info in fileInfo:
-            print(info)
-            print(f"info 0: {info[0]}")
-            if username in info[0]:
-                files.remove(filename) #TODO: fix this line, there is no remove curreentyl
+    global files
+    files = {}
+    for filename, attributes in files.items():
+        keepAttributes = []
+        for entry in attributes:
+            print(f"username: {username}")
+            print(f"entry[0]: {entry[0]}")
+            if(entry[0] != username):
+               keepAttributes.append(entry)
+        if(len(keepAttributes) > 0):
+            files.update({filename:keepAttributes})
+    print(f"available shared files:\n{files}") 
     
 def searchFiles(dataSocket, searchTerm, username):
     temp = []
