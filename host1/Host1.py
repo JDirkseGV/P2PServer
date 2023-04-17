@@ -25,7 +25,7 @@ def main():
         serverSocket.bind((hostIp, serverPort))     
         serverSocket.listen()                                             #sets up tcp socket to listen based on hostIp and serverPort
         print(f"{hostIp}:{serverPort} is now live and listening")
-        serverThread = threading.Thread(target=serverHandlerThread, args=(serverSocket))
+        serverThread = threading.Thread(target=serverHandlerThread, args=(serverSocket,))
         serverThread.start()
 
         #---------------------------------------- centralSocket for persistent central server connection
