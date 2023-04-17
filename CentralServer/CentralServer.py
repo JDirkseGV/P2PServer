@@ -87,16 +87,20 @@ def addFile(username, filename, description, connectionSpeed, hostName, hostPort
 
 def removeFiles(username):
     global files
-    files = {}
+    remove = []
     for filename, attributes in files.items():
         keepAttributes = []
         for entry in attributes:
             print(f"username: {username}")
             print(f"entry[0]: {entry[0]}")
-            if(entry[0] != username):
+            if(entry[0] != "dirksej"):#TODO make sure this is comparing to username
                keepAttributes.append(entry)
         if(len(keepAttributes) > 0):
             files.update({filename:keepAttributes})
+        else:
+            remove.append(filename)
+    for filename in remove:
+        del files[filename]
     print(f"available shared files:\n{files}") 
     
 def searchFiles(dataSocket, searchTerm, username):
