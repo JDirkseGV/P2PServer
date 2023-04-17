@@ -3,7 +3,7 @@ import socket
 import sys
 import time
 import threading
-
+import pickle
 import random
 
 #John Dirkse Data Com Project 3 - p2p host
@@ -13,7 +13,7 @@ sendDelay = .15
 
 def main(): 
     hostIp = "localhost"
-    serverPort = 11000      #11000 for host 1
+    serverPort = random.randint(1025, 65534)     
     hostDataPort = 4243 #host to host data port randomized when setting connection up
 
     centralIp = "localhost"
@@ -59,7 +59,7 @@ def main():
                 match arguments[0].upper(): #Mom get the camera! It only took until python 3.10 for them to add switch statements!
                     case 'LS':
                         print(os.listdir(os.getcwd()))
-                    case 'CONNECT': #TODO connect rework, 1 for central one for p2p
+                    case 'CONNECT': 
                         if len(arguments) == 3:
                             serverLocation = arguments[1]
                             centralServerPort = int(arguments[2])
@@ -78,7 +78,7 @@ def main():
                             time.sleep(sendDelay)
                             centralSocket.send(username.encode())
                             
-                            speed = input("Please enter your connection speed: ")
+                            speed = input("Please enter your connection speed: ")#TODO: guard to be a valid number before sending to server
                             time.sleep(sendDelay)
                             centralSocket.send(speed.encode())
                             
@@ -97,14 +97,14 @@ def main():
                     case 'SEARCH':
                         if len(arguments) == 2:
                             keyword = arguments[1]
-                            searchFiles(keyword)
-                            return
+                            searchFiles(centralSocket, centralDataSocket, keyword)
                         else:
                             print("SEARCH requires format: SEARCH <keyword> and takes 1 argument. Please try again.") 
                     case 'GET':
                         if len(arguments) == 2:
                             filename = arguments[1] #In the wise words of Kurmas: "If a couple extra keystrokes helps untie some knots in your head, then they are keystrokes well spent"
-                            retrieveFiles(centralSocket, centralDataSocket, filename, hostSocket, hostDataSocket)
+                            
+                            retrieveFiles(centralSocket, centralDataSocket, filename, hostSocket, hostDataSocket, hostDataPort)
                         else:
                             print("GET requires format: GET <filename> and takes 1 argument. Please try again.")                             
                     case 'QUIT':
@@ -115,10 +115,10 @@ def main():
                         restart = True
             else:
                 print("Please enter an argument and try again.")
-        
+
     except KeyboardInterrupt:
         print("Host shutting down")
-        killThreads = True
+        killThreads = True  #TODO: figure out why this doesn't shut down properly
         serverThread.join()
         serverSocket.close() 
         centralSocket.close()
@@ -126,17 +126,54 @@ def main():
         sys.exit()
 
 def searchFiles(centralSocket, centralDataSocket, searchTerm):
-    #TODO: get file entries from centralserver
+    centralSocket.send("SEARCH".encode())
+    time.sleep(sendDelay)
+    centralSocket.send(str(searchTerm).encode())
+    time.sleep(sendDelay)
+    dataConnection, serverAdr = centralDataSocket.accept()
+
+    bytes = dataConnection.recv(1024)
+    files = pickle.loads(bytes)
+    print("Available files from other hosts:")
+    print("vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n")
+    for file in files:
+        print(f"Available file: [{file}]")
+    print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+    dataConnection.close()
     return
 
-def retrieveFiles(centralSocket, centralDataSocket, filename, hostSocket, hostDataSocket):
-    #TODO: get ip/port from central, then set up connection with other host
+def retrieveFiles(centralSocket, centralDataSocket, filename, hostSocket, hostDataSocket, hostDataPort):
+    haveFiles = os.listdir(os.getcwd())
+    if(filename in haveFiles):
+        print("ERROR: you already have that file, try a different file.")
+        return
 
     centralSocket.send("GET".encode())
     time.sleep(sendDelay)
-    centralSocket.send(filename.encode())
-    dataConnection, serverAdr = centralDataSocket.accept()
-    fileSize = int(dataConnection.recv(1024).decode())
+    centralSocket.send(str(filename).encode())
+    time.sleep(sendDelay)
+    centralDataConnection, serverAdr = centralDataSocket.accept()
+
+    ip = centralDataConnection.recv(1024).decode()
+    port = centralDataConnection.recv(1024).decode()
+    port = int(port)
+    print(f"ip: {ip}, port: {type(port)}:{port}")
+    centralDataConnection.close()
+
+    print("connecting to peer...")
+    hostSocket.connect((ip, port)) #copying connect from ftp proj
+    hostDataPort = str(hostDataPort)
+    hostSocket.send(hostDataPort.encode()) #let server know info for data transfer socket setup in the future.
+    hostDataPort = int(hostDataPort)
+    time.sleep(sendDelay)
+
+    hostSocket.send("GET".encode())
+    time.sleep(sendDelay)
+    hostSocket.send(str(filename).encode())
+    time.sleep(sendDelay)
+    hostDataConnection, serverAdr = hostDataSocket.accept()
+
+    fileSize = int(hostDataConnection.recv(1024).decode())
     if fileSize == -1:
         print("File not readable, make sure you have the right filename and try again.")
     else:
@@ -144,21 +181,26 @@ def retrieveFiles(centralSocket, centralDataSocket, filename, hostSocket, hostDa
         newFile = open(filename, "wb")
         currentBytes = 0
         while currentBytes < fileSize:
-            chunk = dataConnection.recv(1024)
+            chunk = hostDataConnection.recv(1024)
             newFile.write(chunk)
             currentBytes += 1024
         newFile.close()
         print("File retrieval finished.")
-    dataConnection.close()
+    hostDataConnection.close()
+
+    hostSocket.send("QUIT".encode())
+    hostSocket.close()
     return
 
 
 def serverHandlerThread(serverSocket):
-    while True:
+    while not killThreads:
             clientSocket, clientAddr = serverSocket.accept()        #accepts connections and passes them off to their own thread
             print(f"Accepted connection from {clientAddr[0]}:{clientAddr[1]}")
             clientThread = threading.Thread(target=clientThreadFunction, args=(clientSocket, clientAddr))
             clientThread.start()
+    clientThread.join()
+    return
 
 def clientThreadFunction(clientSocket, clientAddr):
     
@@ -182,6 +224,7 @@ def clientThreadFunction(clientSocket, clientAddr):
                     sendFiles(dataSocket, filename)   
                     dataSocket.close()                  
         clientSocket.close() 
+        return
 
 def sendFiles(dataSocket, filename):  
     print("Attempting to send " +filename + "...")

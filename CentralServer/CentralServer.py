@@ -3,11 +3,11 @@ import socket
 import sys
 import time
 import threading
-import mimetypes
 import pickle
 #John Dirkse Data Com Project 3 - p2p Central Server
 
 killThreads = False
+sendDelay = .15
 files = {}
 
 def main(): 
@@ -27,7 +27,7 @@ def main():
             hostThread.start()
     except KeyboardInterrupt:
         print("Server shutting down")
-        killThreads = True
+        killThreads = True 
         hostThread.join()
         serverSocket.close() 
         print("Shut down complete")           #if control + c, close everything and exit.
@@ -60,7 +60,6 @@ def hostThreadFunction(hostSocket, hostAddr):
             command = ""
             filename = ""
             command = hostSocket.recv(1024).decode() 
-            time.sleep(.5)
 
             match command:
                 case 'QUIT':
@@ -73,7 +72,7 @@ def hostThreadFunction(hostSocket, hostAddr):
                     dataSocket.connect((hostAddr[0], int(dataPort)))
                     searchFiles(dataSocket, searchTerm, username)
                     dataSocket.close()   
-                case 'DOWNLOAD':
+                case 'GET':
                     filename = hostSocket.recv(1024).decode()
                     dataSocket.connect((hostAddr[0], int(dataPort)))
                     serveDownload(dataSocket, filename, username)
@@ -91,9 +90,7 @@ def removeFiles(username):
     for filename, attributes in files.items():
         keepAttributes = []
         for entry in attributes:
-            print(f"username: {username}")
-            print(f"entry[0]: {entry[0]}")
-            if(entry[0] != "dirksej"):#TODO make sure this is comparing to username
+            if(entry[0] != username): #TODO: make sure this is username
                keepAttributes.append(entry)
         if(len(keepAttributes) > 0):
             files.update({filename:keepAttributes})
@@ -105,26 +102,25 @@ def removeFiles(username):
     
 def searchFiles(dataSocket, searchTerm, username):
     temp = []
-    for filename, fileInfo in files.items():
-        print(fileInfo)
-        for info in fileInfo:
-            print(info)
-            print(f"description: {info[2]}")
-            if (searchTerm in info[2] and username != info[0]):
+    for filename, attributes in files.items():
+        for entry in attributes: #TODO:could have multi host bugs/displaying hosts own files bug.
+            if (searchTerm in entry[2] and username != entry[0]):
                 temp.append(filename)
     tempString = pickle.dumps(temp)
-    dataSocket.send(tempString)
+    dataSocket.sendall(tempString)
     return 
 
 def serveDownload(dataSocket, filename, username):
     #send back ip/port that host should request filename from.
     for currentFilename, fileInfo in files.items():
-        if(filename == currentFilename and username != fileInfo[0]):
-            ip = fileInfo[4]
-            port = fileInfo[5]
-            dataSocket.send(str(ip).encode())
-            dataSocket.send(str(port).encode())
-            return
+        for entry in fileInfo:
+            if(filename == currentFilename and username != entry[0]):
+                ip = entry[4]
+                port = entry[5]
+                dataSocket.send(str(ip).encode())
+                time.sleep(sendDelay)
+                dataSocket.send(str(port).encode())
+                return
 
 
 if __name__ == '__main__':

@@ -1,0 +1,4 @@
+3
+host2Sample.txt,host2Sample.txt - sample text file from Host2
+fox.jpg,fox.jpg - cute picture image of a fox
+fluff2.jpg,fluff2.jpg - cute picture image of an unreasonably fluffy puffball
