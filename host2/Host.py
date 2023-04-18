@@ -79,7 +79,7 @@ def main():
                             time.sleep(sendDelay)
                             centralSocket.send(username.encode())
                             
-                            speed = input("Please enter your connection speed: ")
+                            speed = input("Please enter your connection speed(mbps): ")
                             time.sleep(sendDelay)
                             centralSocket.send(speed.encode())
                             
