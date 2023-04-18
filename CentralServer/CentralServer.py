@@ -54,7 +54,14 @@ def hostThreadFunction(hostSocket, hostAddr):
             print(f"filename: {filename}, Description: {description}")
             addFile(username, filename, description, connectionSpeed, hostAddr[0], serverPort)
 
-        print(f"available shared files:\n{files}") #TODO: seperate file entryies by line
+        print("--------------------------------------------")
+        print("Available shared files:")
+        for filename, attributes in files.items():
+            print(f"filename: [{filename}], ", end="")
+            for entry in attributes:
+                print(f"Host Info: {entry}", end="")
+            print("")
+
         while not killThreads:
             dataSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             command = ""
@@ -90,7 +97,7 @@ def removeFiles(username):
     for filename, attributes in files.items():
         keepAttributes = []
         for entry in attributes:
-            if(entry[0] != username): #TODO: make sure this is username
+            if(entry[0] != username):
                keepAttributes.append(entry)
         if(len(keepAttributes) > 0):
             files.update({filename:keepAttributes})
@@ -98,12 +105,18 @@ def removeFiles(username):
             remove.append(filename)
     for filename in remove:
         del files[filename]
-    print(f"available shared files:\n{files}") 
+    print("--------------------------------------------")
+    print("Available shared files:")
+    for filename, attributes in files.items():
+        print(f"filename: [{filename}], ", end="")
+        for entry in attributes:
+            print(f"Host Info: {entry}", end="")
+        print("")
     
 def searchFiles(dataSocket, searchTerm, username):
     temp = []
     for filename, attributes in files.items():
-        for entry in attributes: #TODO:could have multi host bugs/displaying hosts own files bug.
+        for entry in attributes: 
             if (searchTerm in entry[2] and username != entry[0]):
                 temp.append(filename)
     tempString = pickle.dumps(temp)
@@ -112,15 +125,21 @@ def searchFiles(dataSocket, searchTerm, username):
 
 def serveDownload(dataSocket, filename, username):
     #send back ip/port that host should request filename from.
-    for currentFilename, fileInfo in files.items():
-        for entry in fileInfo:
-            if(filename == currentFilename and username != entry[0]):
-                ip = entry[4]
-                port = entry[5]
-                dataSocket.send(str(ip).encode())
-                time.sleep(sendDelay)
-                dataSocket.send(str(port).encode())
-                return
+    if(filename not in files):
+        print("invalid filename requested.")
+        dataSocket.send("-1".encode())
+        return
+    else:
+        print("Providing information to facilitate peer to peer connection.")
+        for currentFilename, fileInfo in files.items():
+            for entry in fileInfo:
+                if(filename == currentFilename and username != entry[0]):
+                    ip = entry[4]
+                    port = entry[5]
+                    dataSocket.send(str(ip).encode())
+                    time.sleep(sendDelay)
+                    dataSocket.send(str(port).encode())
+                    return
 
 
 if __name__ == '__main__':

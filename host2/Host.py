@@ -8,8 +8,8 @@ import random
 
 #John Dirkse Data Com Project 3 - p2p host
 
-killThreads = False
 sendDelay = .15
+killThreads = False
 
 def main(): 
     hostIp = "localhost"
@@ -22,8 +22,9 @@ def main():
     try:
         #serverSocket and server thread setup
         serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
+        serverSocket.settimeout(1) 
         serverSocket.bind((hostIp, serverPort))     
-        serverSocket.listen()                                             #sets up tcp socket to listen based on hostIp and serverPort
+        serverSocket.listen()                                            #sets up tcp socket to listen based on hostIp and serverPort
         print(f"{hostIp}:{serverPort} is now live and listening")
         serverThread = threading.Thread(target=serverHandlerThread, args=(serverSocket,))
         serverThread.start()
@@ -78,7 +79,7 @@ def main():
                             time.sleep(sendDelay)
                             centralSocket.send(username.encode())
                             
-                            speed = input("Please enter your connection speed: ")#TODO: guard to be a valid number before sending to server
+                            speed = input("Please enter your connection speed: ")
                             time.sleep(sendDelay)
                             centralSocket.send(speed.encode())
                             
@@ -118,10 +119,11 @@ def main():
 
     except KeyboardInterrupt:
         print("Host shutting down")
-        killThreads = True  #TODO: figure out why this doesn't shut down properly
-        serverThread.join()
+        global killThreads
+        killThreads = True
         serverSocket.close() 
         centralSocket.close()
+        serverThread.join()#TODO: figure out why this isn't shutting down properly
         print("Shut down complete")           #if control + c, close everything and exit.
         sys.exit()
 
@@ -155,77 +157,97 @@ def retrieveFiles(centralSocket, centralDataSocket, filename, hostSocket, hostDa
     centralDataConnection, serverAdr = centralDataSocket.accept()
 
     ip = centralDataConnection.recv(1024).decode()
-    port = centralDataConnection.recv(1024).decode()
-    port = int(port)
-    print(f"ip: {ip}, port: {type(port)}:{port}")
-    centralDataConnection.close()
-
-    print("connecting to peer...")
-    hostSocket.connect((ip, port)) #copying connect from ftp proj
-    hostDataPort = str(hostDataPort)
-    hostSocket.send(hostDataPort.encode()) #let server know info for data transfer socket setup in the future.
-    hostDataPort = int(hostDataPort)
-    time.sleep(sendDelay)
-
-    hostSocket.send("GET".encode())
-    time.sleep(sendDelay)
-    hostSocket.send(str(filename).encode())
-    time.sleep(sendDelay)
-    hostDataConnection, serverAdr = hostDataSocket.accept()
-
-    fileSize = int(hostDataConnection.recv(1024).decode())
-    if fileSize == -1:
-        print("File not readable, make sure you have the right filename and try again.")
+    if(ip == "-1"):
+        print("invalid file requested.")
+        return
     else:
-        print("File found, downloading and writing to disk...")
-        newFile = open(filename, "wb")
-        currentBytes = 0
-        while currentBytes < fileSize:
-            chunk = hostDataConnection.recv(1024)
-            newFile.write(chunk)
-            currentBytes += 1024
-        newFile.close()
-        print("File retrieval finished.")
-    hostDataConnection.close()
+        port = centralDataConnection.recv(1024).decode()
+        port = int(port)
+        print(f"ip: {ip}, port: {type(port)}:{port}")
+        centralDataConnection.close()
 
-    hostSocket.send("QUIT".encode())
-    hostSocket.close()
-    return
+        print("connecting to peer...")
+        hostSocket.connect((ip, port)) #copying connect from ftp proj
+        hostDataPort = str(hostDataPort)
+        hostSocket.send(hostDataPort.encode()) #let server know info for data transfer socket setup in the future.
+        hostDataPort = int(hostDataPort)
+        time.sleep(sendDelay)
+
+        hostSocket.send("GET".encode())
+        time.sleep(sendDelay)
+        hostSocket.send(str(filename).encode())
+        time.sleep(sendDelay)
+        hostDataConnection, serverAdr = hostDataSocket.accept()
+
+        fileSize = int(hostDataConnection.recv(1024).decode())
+        if fileSize == -1:
+            print("File not readable, make sure you have the right filename and try again.")
+        else:
+            print("File found, downloading and writing to disk...")
+            newFile = open(filename, "wb")
+            currentBytes = 0
+            while currentBytes < fileSize:
+                chunk = hostDataConnection.recv(1024)
+                newFile.write(chunk)
+                currentBytes += 1024
+            newFile.close()
+            print("File retrieval finished.")
+        hostDataConnection.close()
+
+        hostSocket.send("QUIT".encode())
+        hostSocket.close()
+        return
 
 
 def serverHandlerThread(serverSocket):
+    global killThreads
     while not killThreads:
+        try:
             clientSocket, clientAddr = serverSocket.accept()        #accepts connections and passes them off to their own thread
             print(f"Accepted connection from {clientAddr[0]}:{clientAddr[1]}")
             clientThread = threading.Thread(target=clientThreadFunction, args=(clientSocket, clientAddr))
             clientThread.start()
-    clientThread.join()
-    return
-
-def clientThreadFunction(clientSocket, clientAddr):
-    
-        dataPort = clientSocket.recv(1024).decode() 
-
-        while not killThreads:
-            dataSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            command = ""
-            filename = ""
-            command = clientSocket.recv(1024).decode() 
-            #print(f"[{clientAddr[0]}:{clientAddr[1]}]\n{command}")
-
-            match command:
-                case 'QUIT':
-                    print("Disconnecting from client.")
-                    clientSocket.close()
-                    return
-                case 'GET': 
-                    filename = clientSocket.recv(1024).decode()
-                    dataSocket.connect((clientAddr[0], int(dataPort)))
-                    sendFiles(dataSocket, filename)   
-                    dataSocket.close()                  
-        clientSocket.close() 
+        except socket.timeout:
+            continue
+        except OSError:
+            continue
+    try:
+        serverSocket.close()
+        clientThread.join()
+        return
+    except:
         return
 
+
+def clientThreadFunction(clientSocket, clientAddr):
+        global killThreads
+        dataPort = clientSocket.recv(1024).decode() 
+        clientSocket.settimeout(1)
+
+        while not killThreads:
+            try:
+                dataSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                command = ""
+                filename = ""
+                command = clientSocket.recv(1024).decode() 
+                #print(f"[{clientAddr[0]}:{clientAddr[1]}]\n{command}")
+
+                match command:
+                    case 'QUIT':
+                        print("Disconnecting from client.")
+                        clientSocket.close()
+                        return
+                    case 'GET': 
+                        filename = clientSocket.recv(1024).decode()
+                        dataSocket.connect((clientAddr[0], int(dataPort)))
+                        sendFiles(dataSocket, filename)   
+                        dataSocket.close()                   
+            except socket.timeout:
+                continue
+        clientSocket.close()
+        return
+
+            
 def sendFiles(dataSocket, filename):  
     print("Attempting to send " +filename + "...")
     if os.path.isfile(filename):
