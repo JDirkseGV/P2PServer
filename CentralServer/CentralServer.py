@@ -54,7 +54,7 @@ def hostThreadFunction(hostSocket, hostAddr):
             print(f"filename: {filename}, Description: {description}")
             addFile(username, filename, description, connectionSpeed, hostAddr[0], serverPort)
 
-        print(f"available shared files:\n{files}")
+        print(f"available shared files:\n{files}") #TODO: seperate file entryies by line
         while not killThreads:
             dataSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             command = ""

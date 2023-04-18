@@ -78,7 +78,7 @@ def main():
                             time.sleep(sendDelay)
                             centralSocket.send(username.encode())
                             
-                            speed = input("Please enter your connection speed: ")#TODO: guard to be a valid number before sending to server
+                            speed = input("Please enter your connection speed: ")#TODO: guard to be a valid number before sending to server. make it flexible to take any format actually
                             time.sleep(sendDelay)
                             centralSocket.send(speed.encode())
                             
